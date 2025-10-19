@@ -1,0 +1,73 @@
+{
+  "customer": {
+    "side": "none",
+    "details": {
+      "company": "Access Logistic GmbH",
+      "street_address": "Amerling 130",
+      "city": "Kramsach",
+      "postal_code": "6233",
+      "country": "AT",
+      "vat_code": "ATU74076812",
+      "contact_person": "Laura Brunner"
+    }
+  },
+  "loading_locations": [
+    {
+      "company_address": {
+        "company": "TXT International Road SL",
+        "title": "TXT International Road SL",
+        "street_address": "Mas de Baló 3 Parcela 9",
+        "city": "Ribarroja del Turia",
+        "postal_code": "46190",
+        "country": "ES"
+      }
+    }
+  ],
+  "destination_locations": [
+    {
+      "company_address": {
+        "company": "Rogerville Entrepot Manutention",
+        "title": "Rogerville Entrepot Manutention",
+        "street_address": "Shipment 36576",
+        "city": "Rogerville",
+        "postal_code": "76700",
+        "country": "FR"
+      }
+    },
+    {
+      "company_address": {
+        "company": "Bolloré Logistique",
+        "title": "Bolloré Logistique",
+        "street_address": "Route des Caraïbes 5845",
+        "city": "Loon-Plage",
+        "postal_code": "59279",
+        "country": "FR"
+      }
+    },
+    {
+      "company_address": {
+        "company": "Widem Logistics Nv",
+        "title": "Widem Logistics Nv",
+        "street_address": "NV E30 Lar E30,",
+        "city": "Menen",
+        "postal_code": "8930",
+        "country": "BE"
+      }
+    }
+  ],
+  "attachment_filenames": ["accesspdfassistant_1.pdf"],
+  "cargos": [
+    {
+      "title": "Handelswaren",
+      "number": "Holanda , Shipment 36576 , access",
+      "package_count": 27,
+      "package_type": "pallet",
+      "ldm": 0,
+      "weight": 24500
+    }
+  ],
+  "order_reference": "Truck, trailer:",
+  "transport_numbers": "Freight rate in €: / OH211",
+  "freight_price": 2114.2,
+  "freight_currency": "EUR"
+}

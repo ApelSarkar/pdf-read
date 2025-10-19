@@ -22,6 +22,19 @@ composer install
 php artisan tinker
 ```
 
+6. In Tinker console try this below command to see the parsed data:
+```shell
+use Spatie\PdfToText\Pdf;
+use App\Assistants\CustomPdfAssistant;
+
+$path = 'storage/pdf_client_test/AccessPdfAssistant_1.pdf';
+$text = Pdf::getText($path, env('PDFTOTEXT_PATH'));
+$lines = array_values(array_filter(array_map('trim', explode("\n", $text))));
+
+$assistant = new CustomPdfAssistant();
+$assistant->processLines($lines, 'AccessPdfAssistant_1.pdf');
+```
+
 
 ====================================================================================================
 
