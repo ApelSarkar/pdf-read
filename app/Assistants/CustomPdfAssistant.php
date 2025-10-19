@@ -25,12 +25,10 @@ class CustomPdfAssistant extends PdfClient
     {
         $tour_li = array_find_key($lines, fn($l) => $l == "Tournumber:");
         $order_reference = trim($lines[$tour_li + 2], '* ');
-        // $order_reference = trim($lines[$tour_li + 1], '* ');
-
 
         $truck_li = array_find_key($lines, fn($l) => $l == "Truck, trailer:");
         $truck_number = $lines[$truck_li + 2] ?? null;
-        // $truck_number = $lines[$truck_li + 1] ?? null;
+
 
         $vehicle_li = array_find_key($lines, fn($l) => $l == "Vehicle type:");
         $trailer_number = null;
@@ -40,24 +38,47 @@ class CustomPdfAssistant extends PdfClient
         }
 
         $transport_numbers = join(' / ', array_filter([$truck_number, $trailer_number]));
+        try {
+            $freight_li = array_find_key($lines, fn($l) => Str::startsWith($l, "Freight rate in €:"));
+            $freight_price_raw = $lines[$freight_li + 1] ?? $lines[$freight_li + 2] ?? null;
+            $freight_price_clean = preg_replace('/[^0-9,\.]/', '', $freight_price_raw);
+            $freight_price_clean = str_replace([' ', ','], ['', '.'], $freight_price_clean);
+            $freight_price = (float) $freight_price_clean;
+            $freight_currency = 'EUR';
+        } catch (\Throwable $e) {
+            dd('Error in freight parsing', $e->getMessage(), $freight_price);
+        }
 
-        $freight_li = array_find_key($lines, fn($l) => $l == "Freight rate in €:");
-        // $freight_price = $lines[$freight_li + 2] ?? null;
-        $freight_price = $lines[$freight_li + 2] ?? null;
-        $freight_price = preg_replace('/[^0-9,\.]/', '', $freight_price);
-        $freight_price = uncomma($freight_price);
-        // if ($freight_price === null) {
-        //     $freight_price = 0;
-        // }
         $freight_currency = 'EUR';
 
-        $loading_li = array_find_key($lines, fn($l) => $l == "Loading sequence:");
-        $unloading_li = array_find_key($lines, fn($l) => $l == "Unloading sequence:");
-        $regards_li = array_find_key($lines, fn($l) => $l == "Best regards");
+        $keywords = [
+            'Loading sequence:',
+            'Loading address:',
+            'Pasikrovimo adresas:',
+            'Abholadresse:',
+        ];
+        $loading_li = array_find_key($lines, function ($line) use ($keywords) {
+            $line = trim($line); 
+            foreach ($keywords as $kw) {
+                if (stripos($line, $kw) !== false) {
+                    return true;
+                }
+            }
+            return false;
+        });
 
-        // $loading_locations = $this->extractLocations(
-        //     array_slice($lines, $loading_li + 1, max(0, ($unloading_li - 1 - $loading_li)))
-        // );
+        $unloading_li = array_find_key($lines, function ($l) {
+            $l = trim($l);
+            return Str::contains($l, [
+                'Unloading sequence',
+                'Delivery address',
+                'Pristatymo adresas',   // Lithuanian
+                'Lieferadresse',        // German
+                'Unload address',
+            ]);
+        });
+
+        $regards_li = array_find_key($lines, fn($l) => $l == "Best regards");
 
         $loading_locations = $this->extractLocations(
             array_slice($lines, $loading_li + 1, max(0, ($unloading_li - 1 - $loading_li)))
@@ -67,7 +88,10 @@ class CustomPdfAssistant extends PdfClient
         );
 
         $contact_li = array_find_key($lines, fn($l) => Str::startsWith($l, 'Contactperson: '));
-        $contact = $contact_li !== null ? explode(': ', $lines[$contact_li], 2)[1] ?? null : null;
+        $contact = $contact_li !== null
+            ? trim(explode(': ', $lines[$contact_li], 2)[1] ?? '')
+            : 'Unknown';
+
 
         $customer = [
             'side' => 'none',
@@ -98,7 +122,6 @@ class CustomPdfAssistant extends PdfClient
             'freight_currency',
         );
 
-        // return result of createOrder so caller (tinker) receives structured array
         return $this->createOrder($data);
     }
 
@@ -107,32 +130,28 @@ class CustomPdfAssistant extends PdfClient
         $output = [];
         $index = 0;
         $count = count($lines);
-
         while ($index < $count) {
             $datetime = null;
             $location = null;
 
-            // Start search from current index
-            // Try to find datetime (e.g., '11.02.2025' or '11.02.2025 08:00-16:00') in the next few lines (max 4 lines)
             for ($i = $index; $i < $index + 4 && $i < $count; $i++) {
                 if (preg_match('/^[0-9\.]+ ?([0-9:]+)?-?([0-9:]+)?$/', trim($lines[$i]))) {
                     $datetime = $lines[$i];
-                    $index = $i + 1; // Start next search after datetime
+                    $index = $i + 1;
                     break;
                 }
             }
 
             for ($i = $index; $i < $index + 4 && $i < $count; $i++) {
-                // Check for a complex address pattern (Company, Street, Postal City)
+
                 if (preg_match('/^(.+?)\s*, +(.+?)\s*, +([A-Z]{1,2}-?[0-9]{4,}) +(.+)$/ui', $lines[$i])) {
                     $location = $lines[$i];
-                    $index = $i + 1; // Start next search after location
+                    $index = $i + 1; 
                     break;
                 }
             }
 
-            // If we found both, process the location
-            if ($location) { 
+            if ($location) {
                 $company_address = $this->parseCompanyAddress($location);
                 if (!empty($company_address['company'])) {
                     $loc = [
@@ -155,7 +174,6 @@ class CustomPdfAssistant extends PdfClient
 
     public function extractLocation(array $lines)
     {
-        // guard against missing expected indices
         $datetime = $lines[2] ?? null;
         $location = $lines[4] ?? null;
 
@@ -182,7 +200,6 @@ class CustomPdfAssistant extends PdfClient
             return [];
         }
 
-        // preg_match('/^([0-9\.]+) ?([0-9:]+)?-?([0-9:]+)?$/', trim($datetime), $matches);
         preg_match('/^([0-9]+(?:\.[0-9]+)+) ?([0-9:]+)?-?([0-9:]+)?$/', trim($datetime), $matches);
         if (!$matches) {
             return [];
@@ -246,7 +263,6 @@ class CustomPdfAssistant extends PdfClient
         $street = $parts[1] ?? null;
         $city = $parts[count($parts) - 1] ?? null;
 
-        // attempt to extract postal and country from last part
         $postal_code = null;
         $country = null;
         if (isset($parts[count($parts) - 2])) {
@@ -273,21 +289,20 @@ class CustomPdfAssistant extends PdfClient
 
         $amount_li = array_find_key($lines, fn($l) => $l == "Amount:");
         $package_count = isset($lines[$amount_li + 1]) && $lines[$amount_li + 1]
-            ? uncomma($lines[$amount_li + 1])
-            : null;
+            ? (int) uncomma($lines[$amount_li + 1])
+            : 1.0;
 
         $unit_li = array_find_key($lines, fn($l) => $l == "Unit:");
-        $package_type = isset($lines[$unit_li + 1]) ? $this->mapPackageType($lines[$unit_li + 1]) : null;
+        $package_type = isset($lines[$unit_li + 1]) ? $this->mapPackageType($lines[$unit_li + 1]) : "OTHER";
 
         $weight_li = array_find_key($lines, fn($l) => $l == "Weight:");
-        $weight = isset($lines[$weight_li + 1]) && $lines[$weight_li + 1]
-            ? uncomma($lines[$weight_li + 1])
-            : null;
+        $weight_raw = isset($lines[$weight_li + 1]) ? $lines[$weight_li + 1] : null;
+        $weight_clean = preg_replace('/[^0-9,\.]/', '', $weight_raw);
+        $weight_value = (float) str_replace(',', '.', $weight_clean);
 
         $ldm_li = array_find_key($lines, fn($l) => $l == "Loadingmeter:");
-        $ldm = isset($lines[$ldm_li + 1]) && $lines[$ldm_li + 1]
-            ? uncomma($lines[$ldm_li + 1])
-            : null;
+        $ldm_raw = isset($lines[$ldm_li + 1]) ? $lines[$ldm_li + 1] : null;
+        $ldm_value = (float) uncomma($ldm_raw);
 
         $load_ref_li = array_find_key($lines, fn($l) => Str::startsWith($l, "Loading reference:"));
         $load_ref = $load_ref_li !== null
@@ -305,13 +320,14 @@ class CustomPdfAssistant extends PdfClient
             [
                 'title' => $title,
                 'number' => $number,
-                'package_count' => $package_count ?? 1,
+                'package_count' => $package_count,
                 'package_type' => $package_type,
-                'ldm' => $ldm,
-                'weight' => $weight,
+                'ldm' => $ldm_value,
+                'weight' => $weight_value,
             ]
         ];
     }
+
 
     public function mapPackageType(string $type)
     {
